@@ -1,6 +1,6 @@
 import { sakila, sakilaDataWareHouse } from "../models/db.js";
 
-export async function etl_payment_type() {
+export async function etl_payment_type(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
@@ -13,14 +13,6 @@ export async function etl_payment_type() {
             id: r.payment_type_id,
             name: r.name,
         }));
-        // Eliminar y crear la tabla en el Data Warehouse
-        await sakilaDataWareHouse.query(`DROP TABLE IF EXISTS payment_type;`);
-        await sakilaDataWareHouse.query(`
-            CREATE TABLE IF NOT EXISTS payment_type (
-                payment_type_id INT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL
-            );
-        `);
         // 3. CARGA (Load)
         for (const pt of paymentTypes) {
             await sakilaDataWareHouse.query(

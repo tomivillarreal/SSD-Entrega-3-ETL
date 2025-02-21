@@ -1,6 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../models/db.js";
-
-export async function etl_film() {
+export async function etl_film(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
@@ -13,14 +11,6 @@ export async function etl_film() {
             id: r.film_id,
             title: r.title,
         }));
-        // Eliminar y crear la tabla en el Data Warehouse
-        await sakilaDataWareHouse.query(`DROP TABLE IF EXISTS film;`);
-        await sakilaDataWareHouse.query(`
-            CREATE TABLE IF NOT EXISTS film (
-                film_id INT PRIMARY KEY,
-                title VARCHAR(255) NOT NULL
-            );
-        `);
         // 3. CARGA (Load)
         for (const film of films) {
             await sakilaDataWareHouse.query(

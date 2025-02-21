@@ -1,6 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../models/db.js";
-
-export async function etl_customer() {
+export async function etl_customer(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
@@ -14,15 +12,6 @@ export async function etl_customer() {
             firstName: r.first_name,
             lastName: r.last_name,
         }));
-        // Eliminar y crear la tabla en el Data Warehouse
-        await sakilaDataWareHouse.query(`DROP TABLE IF EXISTS customer;`);
-        await sakilaDataWareHouse.query(`
-            CREATE TABLE IF NOT EXISTS customer (
-                customer_id INT PRIMARY KEY,
-                first_name VARCHAR(255) NOT NULL,
-                last_name VARCHAR(255) NOT NULL
-            );
-        `);
         // 3. CARGA (Load)
         for (const customer of customers) {
             await sakilaDataWareHouse.query(

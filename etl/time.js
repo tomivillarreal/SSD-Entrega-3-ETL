@@ -1,6 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../models/db.js";
-
-export async function etl_time() {
+export async function etl_time(sakila, sakilaDataWareHouse) {
   try {
     // Extraer año, mes y día de la columna rental_date en la tabla rental.
     const { rows: rental } = await sakila.query(`
@@ -16,17 +14,6 @@ export async function etl_time() {
       .map(r => `${r.year}-${r.month}-${r.day}`)
       .filter((v, i, a) => a.indexOf(v) === i)
       .sort();
-
-    // Eliminar la tabla time si existe y crearla nuevamente.
-    await sakilaDataWareHouse.query("DROP TABLE IF EXISTS time;");
-    await sakilaDataWareHouse.query(`
-      CREATE TABLE IF NOT EXISTS time (
-        id INT PRIMARY KEY, 
-        ano INT NOT NULL, 
-        mes INT NOT NULL, 
-        dia INT NOT NULL
-      );
-    `);
 
     // Preparar los valores para la inserción.
     const timeValues = tiempos

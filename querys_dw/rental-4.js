@@ -1,6 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../../models/db.js";
-
-export async function etl_rental_4() {
+export async function etl_rental_4(sakila, sakilaDataWareHouse) {
     try {
         // 1. Extracción: obtener alquileres con descuentos de los últimos 30 años.
         const extractQuery = `
@@ -27,19 +25,6 @@ export async function etl_rental_4() {
         `;
         const { rows } = await sakila.query(extractQuery);
         console.log("Extracción completada." + rows.length + " registros obtenidos.");
-        // 2. Crear la tabla de hechos TH_Rental en el Data Warehouse.
-        await sakilaDataWareHouse.query(`DROP TABLE IF EXISTS rental;`);
-        await sakilaDataWareHouse.query(`
-            CREATE TABLE IF NOT EXISTS rental (
-                id SERIAL PRIMARY KEY,
-                customer_id INT NOT NULL,
-                film_id INT NOT NULL,
-                category_id INT NOT NULL,
-                store_id INT NOT NULL,
-                time_id INT NOT NULL,
-                discount_amount NUMERIC(10,2) NOT NULL
-            );
-        `);
 
         // 3. Carga: Insertar cada registro en TH_Rental.
         for (const row of rows) {

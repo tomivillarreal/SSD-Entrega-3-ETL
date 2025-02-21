@@ -1,0 +1,50 @@
+services:
+  sakila-db:
+    image: ssd_sakila:latest
+    container_name: sakila-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1188
+    ports:
+      - "5432:5432"
+    volumes:
+      - sakila_data:/var/lib/postgresql/data
+
+  sakila-dw:
+    image: postgres:15
+    container_name: sakila-dw
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1188
+      POSTGRES_DB: sakila_dw
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./models/sakila_dw_init.sql:/docker-entrypoint-initdb.d/sakila_dw_init.sql
+      # - sakila_dw_data:/var/lib/postgresql/data
+
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: etl-app
+    restart: always
+    depends_on:
+      - sakila-db
+      - sakila-dw
+    environment:
+      SAKILA_DATABASE_URL: "postgres://postgres:1188@sakila-db:5432/postgres"
+      SAKILA_DATAWAREHOUSE_URL: "postgres://postgres:1188@sakila-dw:5432/sakila_dw"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: ["node", "server.js"]
+
+volumes:
+  sakila_data:
+  # sakila_dw_data:
+

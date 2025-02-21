@@ -1,6 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../models/db.js";
-
-export async function etl_category() {
+export async function etl_category(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
@@ -12,16 +10,6 @@ export async function etl_category() {
             id: r.category_id,
             name: r.name,
         }));
-        await sakilaDataWareHouse.query(
-            `DROP TABLE IF EXISTS category;`
-        );
-        await sakilaDataWareHouse.query(
-            `CREATE TABLE IF NOT EXISTS category (
-        category_id INT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL
-        );
-        `
-        );
         // 3. CARGA (Load)
         for (const category of categories) {
             await sakilaDataWareHouse.query(

@@ -1,6 +1,6 @@
 import { sakila, sakilaDataWareHouse } from "../models/db.js";
 
-export async function etl_staff() {
+export async function etl_staff(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
@@ -14,15 +14,6 @@ export async function etl_staff() {
             firstName: r.first_name,
             lastName: r.last_name,
         }));
-        // Eliminar y crear la tabla en el Data Warehouse
-        await sakilaDataWareHouse.query(`DROP TABLE IF EXISTS staff;`);
-        await sakilaDataWareHouse.query(`
-            CREATE TABLE IF NOT EXISTS staff (
-                staff_id INT PRIMARY KEY,
-                first_name VARCHAR(255) NOT NULL,
-                last_name VARCHAR(255) NOT NULL
-            );
-        `);
         // 3. CARGA (Load)
         for (const staff of staffList) {
             await sakilaDataWareHouse.query(

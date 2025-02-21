@@ -8,22 +8,31 @@ import { etl_payment_type } from './etl/payment_type.js';
 import { etl_staff } from './etl/staff.js';
 import { etl_store } from './etl/store.js';
 import { etl_time } from './etl/time.js';
-import { etl_rental_4 } from './etl/rental/rental-4.js';
+import { etl_rental_4 } from './querys_dw/rental-4.js';
+import { sakila, sakilaDataWareHouse } from './models/db.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.listen(port, async () => {
-    console.log(`Cargando datos...`);
-    // await etl_actor();
-    // await etl_category();
-    // await etl_customer();
-    // await etl_film();
-    // await etl_language();
-    // await etl_payment_type();
-    // await etl_staff();
-    // await etl_store();
-    // await etl_time();
-    await etl_rental_4();
-    console.log(`Datos cargados en el Data Warehouse`);
+    console.log(`Inicializando databases...`);
+    const sakilaRelationalDatabase = sakila;
+    const sakilaDataWarehouse = sakilaDataWareHouse;
+    console.log(`Databases inicializadas`);
+    console.log(`Cargando datos en el Data Warehouse...`);
+    await etl_actor(sakilaRelationalDatabase, sakilaDataWarehouse);
+    setTimeout(async () => {
+        await etl_category(sakilaRelationalDatabase, sakilaDataWarehouse);
+        await etl_customer(sakilaRelationalDatabase, sakilaDataWarehouse);
+        await etl_film(sakilaRelationalDatabase, sakilaDataWarehouse);
+        await etl_language(sakilaRelationalDatabase, sakilaDataWarehouse);
+        await etl_payment_type(sakilaRelationalDatabase, sakilaDataWarehouse);
+        await etl_staff(sakilaRelationalDatabase, sakilaDataWarehouse);
+        await etl_store(sakilaRelationalDatabase, sakilaDataWarehouse);
+        await etl_time(sakilaRelationalDatabase, sakilaDataWarehouse);
+        console.log(`Datos cargados en el Data Warehouse`);
+        console.log(`Ejecutando querys en el Data Warehouse...`);
+        await etl_rental_4(sakilaRelationalDatabase, sakilaDataWarehouse);
+        console.log(`Datos cargados en el Data Warehouse`);
+    }, 6000);
 });

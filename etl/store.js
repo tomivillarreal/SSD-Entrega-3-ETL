@@ -1,6 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../models/db.js";
-
-export async function etl_store() {
+export async function etl_store(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
@@ -15,15 +13,6 @@ export async function etl_store() {
             managerStaffId: r.manager_staff_id,
             address: r.address,
         }));
-        // Eliminar y crear la tabla en el Data Warehouse
-        await sakilaDataWareHouse.query(`DROP TABLE IF EXISTS store;`);
-        await sakilaDataWareHouse.query(`
-            CREATE TABLE IF NOT EXISTS store (
-                store_id INT PRIMARY KEY,
-                manager_staff_id INT NOT NULL,
-                address VARCHAR NOT NULL
-            );
-        `);
         // 3. CARGA (Load)
         for (const store of stores) {
             await sakilaDataWareHouse.query(

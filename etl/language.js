@@ -1,6 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../models/db.js";
-
-export async function etl_language() {
+export async function etl_language(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
@@ -13,14 +11,6 @@ export async function etl_language() {
             id: r.language_id,
             name: r.name,
         }));
-        // Eliminar y crear la tabla en el Data Warehouse
-        await sakilaDataWareHouse.query(`DROP TABLE IF EXISTS language;`);
-        await sakilaDataWareHouse.query(`
-            CREATE TABLE IF NOT EXISTS language (
-                language_id INT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL
-            );
-        `);
         // 3. CARGA (Load)
         for (const lang of languages) {
             await sakilaDataWareHouse.query(
