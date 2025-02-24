@@ -49,16 +49,26 @@ CREATE TABLE IF NOT EXISTS store (
 );
 
 CREATE TABLE IF NOT EXISTS rental (
-    id SERIAL PRIMARY KEY,
-    category_id INT,
-    language_id INT,
-    customer_id INT,
-    film_id INT,
-    payment_type_id INT,
-    time_id INT,
-    store_id INT,
-    income_amount NUMERIC(10,2),
-    fine_amount NUMERIC(10,2),
-    discount_amount NUMERIC(10,2),
-    discount_percent NUMERIC(10,2)
+    id INT PRIMARY KEY,          -- Clave surrogate que identifica cada transacción
+    time_id INT NOT NULL,               -- Clave foránea a la dimensión de tiempo
+    customer_id INT NOT NULL,           -- Clave foránea a la dimensión de cliente
+    film_id INT NOT NULL,               -- Clave foránea a la dimensión de film
+    store_id INT NOT NULL,              -- Clave foránea a la dimensión de tienda
+    staff_id INT NOT NULL,              -- Clave foránea a la dimensión de staff
+    payment_type_id INT NOT NULL,       -- Clave foránea a la dimensión de tipo de pago
+    category_id INT NOT NULL,                   -- Opcional: se puede incluir para preservar el valor histórico
+    language_id INT NOT NULL,                   -- Opcional: se puede incluir para preservar el valor histórico
+    incomeAmount DECIMAL(10,2) NOT NULL,  -- Monto de ingreso
+    fineAmount DECIMAL(10,2) NOT NULL,    -- Monto de multa (si aplica)
+    discountPercentage DECIMAL(5,2),      -- Porcentaje de descuento (para análisis, se utilizará promedio u otra función)
+    discountQuantity INT,                 -- Cantidad de descuento, de acuerdo al negocio
+    CONSTRAINT fk_time FOREIGN KEY (time_id) REFERENCES time(id),
+    CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
+    CONSTRAINT fk_film FOREIGN KEY (film_id) REFERENCES film(film_id),
+    CONSTRAINT fk_store FOREIGN KEY (store_id) REFERENCES store(store_id),
+    CONSTRAINT fk_staff FOREIGN KEY (staff_id) REFERENCES staff(staff_id),
+    CONSTRAINT fk_payment_type FOREIGN KEY (payment_type_id) REFERENCES payment_type(payment_type_id),
+    CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES category(category_id),
+    CONSTRAINT fk_language FOREIGN KEY (language_id) REFERENCES language(language_id)
+    -- Si decides mantener category_id y language_id en la tabla de hechos, puedes agregar las claves foráneas
 );

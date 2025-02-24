@@ -1,44 +1,76 @@
-export async function etl_time(sakila, sakilaDataWareHouse) {
+
+export async function etl_rental(sakilaPool, sakilaDataWarehousePool) {
   try {
-    // 2. Extraer y transformar datos desde sakila (la fuente)
-    // Nota: La tabla sakila no tiene la dimensión "time". Extraemos rental_date para conformarla en el DW.
-    const extractionQuery = `
-      SELECT
-          r.rental_id AS id,
-          r.rental_date,
-          r.customer_id,
-          inv.film_id,
-          s.store_id,
-          r.staff_id,
-          p.payment_type_id,
-          fc.category_id,
-          f.language_id,
-          p.amount AS incomeAmount,
-          CASE 
-              WHEN r.return_date IS NOT NULL 
-                   AND r.return_date > r.rental_date + INTERVAL '3 days'
-                THEN EXTRACT(day FROM (r.return_date - (r.rental_date + INTERVAL '3 days'))) * 1.00 
-              ELSE 0 
-          END AS fineAmount,
-          COALESCE(d.discount_value, 0) AS discountPercentage,
-          CASE 
-              WHEN p.discount_id IS NOT NULL THEN 1 
-              ELSE 0 
-          END AS discountQuantity
-      FROM rental r
-          JOIN inventory inv ON r.inventory_id = inv.inventory_id
-          JOIN film f ON inv.film_id = f.film_id
-          JOIN film_category fc ON f.film_id = fc.film_id
-          JOIN store s ON inv.store_id = s.store_id
-          JOIN "payment" p ON r.rental_id = p.rental_id
-          LEFT JOIN discount d ON p.discount_id = d.discount_id;
+    // 1. Crear la tabla de hechos "rental" en el DW (si no existe)
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS rental (
+          id INT PRIMARY KEY,                -- Clave surrogate: mapea r.rental_id
+          time_id INT NOT NULL,              -- Clave foránea a la dimensión de tiempo (conformada con rental_date)
+          customer_id INT NOT NULL,          -- Clave foránea a la dimensión de cliente
+          film_id INT NOT NULL,              -- Clave foránea a la dimensión de film
+          store_id INT NOT NULL,             -- Clave foránea a la dimensión de tienda
+          staff_id INT NOT NULL,             -- Clave foránea a la dimensión de staff
+          payment_type_id INT NOT NULL,      -- Clave foránea a la dimensión de tipo de pago
+          category_id INT NOT NULL,          -- Valor histórico de la categoría de la película
+          language_id INT NOT NULL,          -- Valor histórico del idioma de la película
+          incomeAmount DECIMAL(10,2) NOT NULL, -- Monto de ingreso
+          fineAmount DECIMAL(10,2) NOT NULL,   -- Monto de multa (si aplica)
+          discountPercentage DECIMAL(5,2),     -- Porcentaje de descuento
+          discountQuantity INT,                -- Cantidad de descuento según el negocio
+          CONSTRAINT fk_time FOREIGN KEY (time_id) REFERENCES time(id),
+          CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
+          CONSTRAINT fk_film FOREIGN KEY (film_id) REFERENCES film(film_id),
+          CONSTRAINT fk_store FOREIGN KEY (store_id) REFERENCES store(store_id),
+          CONSTRAINT fk_staff FOREIGN KEY (staff_id) REFERENCES staff(staff_id),
+          CONSTRAINT fk_payment_type FOREIGN KEY (payment_type_id) REFERENCES payment_type(payment_type_id),
+          CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES category(category_id),
+          CONSTRAINT fk_language FOREIGN KEY (language_id) REFERENCES language(language_id)
+      );
     `;
+    await sakilaDataWarehousePool.query(createTableQuery);
+    console.log('Tabla "rental" creada o verificada en el DW.');
+
+    // 2. Extraer y transformar datos desde sakila
+    // NOTA: En sakila no existe la tabla "time", por lo que extraemos rental_date para luego conformar time_id en el DW.
+    const extractionQuery = `
+    SELECT
+        r.rental_id AS id,
+        r.rental_date,
+        r.customer_id,
+        inv.film_id,
+        st.store_id,          -- Se obtiene el store_id desde la tabla staff, que indica la tienda del empleado
+        r.staff_id,
+        p.payment_type_id,
+        fc.category_id,
+        f.language_id,
+        p.amount AS incomeAmount,
+        CASE 
+            WHEN r.return_date IS NOT NULL 
+                 AND r.return_date > r.rental_date + INTERVAL '3 days'
+              THEN EXTRACT(day FROM (r.return_date - (r.rental_date + INTERVAL '3 days'))) * 1.00 
+            ELSE 0 
+        END AS fineAmount,
+        COALESCE(d.discount_value, 0) AS discountPercentage,
+        CASE 
+            WHEN p.discount_id IS NOT NULL THEN 1 
+            ELSE 0 
+        END AS discountQuantity
+    FROM rental r
+        JOIN inventory inv ON r.inventory_id = inv.inventory_id
+        JOIN film f ON inv.film_id = f.film_id
+        JOIN film_category fc ON f.film_id = fc.film_id
+        JOIN staff st ON r.staff_id = st.staff_id         -- Se une con staff para obtener el store_id correcto
+        JOIN "payment" p ON r.rental_id = p.rental_id
+        LEFT JOIN discount d ON p.discount_id = d.discount_id;
+  `;
+  
     console.log('Ejecutando extracción de datos desde sakila...');
-    const { rows } = await sakila.query(extractionQuery);
+    const { rows } = await sakilaPool.query(extractionQuery);
     console.log(`Extracción completada. Se obtuvieron ${rows.length} registros.`);
 
-    // 3. Insertar los datos transformados en el DW usando la dimensión "time" del DW.
-    const client = await sakilaDataWareHouse.connect();
+    // 3. Insertar los datos transformados en la tabla "rental" del DW
+    // Se usa un loop para insertar cada registro y, mediante un subquery, se obtiene el time_id desde la tabla time del DW.
+    const client = await sakilaDataWarehousePool.connect();
     try {
       await client.query('BEGIN');
 
@@ -77,10 +109,10 @@ export async function etl_time(sakila, sakilaDataWareHouse) {
       `;
 
       for (const row of rows) {
-        // Convertir rental_date a un objeto Date para extraer año, mes y día.
+        // Convertir rental_date a objeto Date para extraer año, mes y día
         const rentalDate = new Date(row.rental_date);
         const rentalYear = rentalDate.getFullYear();
-        const rentalMonth = rentalDate.getMonth() + 1; // Los meses en JavaScript son 0-indexados.
+        const rentalMonth = rentalDate.getMonth() + 1; // Los meses en JS son 0-indexados
         const rentalDay = rentalDate.getDate();
 
         await client.query(insertQuery, [
@@ -95,8 +127,8 @@ export async function etl_time(sakila, sakilaDataWareHouse) {
           row.payment_type_id,
           row.category_id,
           row.language_id,
-          row.incomeamount,      // Asegúrate que el nombre coincide con el alias de la consulta
-          row.fineamount,
+          row.incomeamount,      // Verifica que el alias de la columna sea el mismo (incomeAmount)
+          row.fineamount,        // idem para fineAmount
           row.discountpercentage,
           row.discountquantity
         ]);
@@ -112,6 +144,7 @@ export async function etl_time(sakila, sakilaDataWareHouse) {
     }
 
     // 4. (Opcional) Consulta unificada de indicadores para validar la carga en el DW.
+    // En esta consulta se utiliza la tabla "time" del DW, ya que allí existe.
     const unifiedQuery = `
       WITH 
       q1 AS (
@@ -194,8 +227,9 @@ export async function etl_time(sakila, sakilaDataWareHouse) {
              total_multa
       FROM q5;
     `;
-    const unifiedResult = await sakilaDataWareHouse.query(unifiedQuery);
+    const unifiedResult = await sakilaDataWarehousePool.query(unifiedQuery);
     console.log('Consulta unificada de indicadores:', unifiedResult.rows);
+
   } catch (error) {
     console.error('Error en el proceso ETL:', error);
   }
