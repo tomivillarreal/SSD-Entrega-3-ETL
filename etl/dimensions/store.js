@@ -2,7 +2,7 @@ export async function etl_store(sakila, sakilaDataWareHouse) {
     try {
         // 1. EXTRACCIÓN (Extract)
         const { rows } = await sakila.query(`
-            SELECT store_id, address.address, 
+            SELECT store_id, address.address
             FROM store
             LEFT JOIN address ON store.address_id = address.address_id
             ;
@@ -17,12 +17,12 @@ export async function etl_store(sakila, sakilaDataWareHouse) {
             await sakilaDataWareHouse.query(
                 `
                 INSERT INTO store (store_id, address)
-                VALUES ($1, $2, $3)
+                VALUES ($1, $2)
                 ON CONFLICT (store_id)
                 DO UPDATE SET
                     address = EXCLUDED.address;
                 `,
-                [store.id, store.managerStaffId, store.address]
+                [store.id, store.address]
             );
         }
         console.log("ETL de store finalizado");
