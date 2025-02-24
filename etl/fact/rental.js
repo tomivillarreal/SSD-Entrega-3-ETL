@@ -1,36 +1,7 @@
 
 export async function etl_rental(sakilaPool, sakilaDataWarehousePool) {
   try {
-    // 1. Crear la tabla de hechos "rental" en el DW (si no existe)
-    const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS rental (
-          id INT PRIMARY KEY,                -- Clave surrogate: mapea r.rental_id
-          time_id INT NOT NULL,              -- Clave foránea a la dimensión de tiempo (conformada con rental_date)
-          customer_id INT NOT NULL,          -- Clave foránea a la dimensión de cliente
-          film_id INT NOT NULL,              -- Clave foránea a la dimensión de film
-          store_id INT NOT NULL,             -- Clave foránea a la dimensión de tienda
-          staff_id INT NOT NULL,             -- Clave foránea a la dimensión de staff
-          payment_type_id INT NOT NULL,      -- Clave foránea a la dimensión de tipo de pago
-          category_id INT NOT NULL,          -- Valor histórico de la categoría de la película
-          language_id INT NOT NULL,          -- Valor histórico del idioma de la película
-          incomeAmount DECIMAL(10,2) NOT NULL, -- Monto de ingreso
-          fineAmount DECIMAL(10,2) NOT NULL,   -- Monto de multa (si aplica)
-          discountPercentage DECIMAL(5,2),     -- Porcentaje de descuento
-          discountQuantity INT,                -- Cantidad de descuento según el negocio
-          CONSTRAINT fk_time FOREIGN KEY (time_id) REFERENCES time(id),
-          CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
-          CONSTRAINT fk_film FOREIGN KEY (film_id) REFERENCES film(film_id),
-          CONSTRAINT fk_store FOREIGN KEY (store_id) REFERENCES store(store_id),
-          CONSTRAINT fk_staff FOREIGN KEY (staff_id) REFERENCES staff(staff_id),
-          CONSTRAINT fk_payment_type FOREIGN KEY (payment_type_id) REFERENCES payment_type(payment_type_id),
-          CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES category(category_id),
-          CONSTRAINT fk_language FOREIGN KEY (language_id) REFERENCES language(language_id)
-      );
-    `;
-    await sakilaDataWarehousePool.query(createTableQuery);
-    console.log('Tabla "rental" creada o verificada en el DW.');
-
-    // 2. Extraer y transformar datos desde sakila
+    // 1. Extraer y transformar datos desde sakila
     // NOTA: En sakila no existe la tabla "time", por lo que extraemos rental_date para luego conformar time_id en el DW.
     const extractionQuery = `
     SELECT
@@ -68,7 +39,7 @@ export async function etl_rental(sakilaPool, sakilaDataWarehousePool) {
     const { rows } = await sakilaPool.query(extractionQuery);
     console.log(`Extracción completada. Se obtuvieron ${rows.length} registros.`);
 
-    // 3. Insertar los datos transformados en la tabla "rental" del DW
+    // 2. Insertar los datos transformados en la tabla "rental" del DW
     // Se usa un loop para insertar cada registro y, mediante un subquery, se obtiene el time_id desde la tabla time del DW.
     const client = await sakilaDataWarehousePool.connect();
     try {
@@ -143,7 +114,7 @@ export async function etl_rental(sakilaPool, sakilaDataWarehousePool) {
       client.release();
     }
 
-    // 4. (Opcional) Consulta unificada de indicadores para validar la carga en el DW.
+    // 3. (Opcional) Consulta unificada de indicadores para validar la carga en el DW.
     // En esta consulta se utiliza la tabla "time" del DW, ya que allí existe.
     const unifiedQuery = `
       WITH 

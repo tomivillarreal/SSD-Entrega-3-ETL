@@ -1,4 +1,4 @@
-import { sakila, sakilaDataWareHouse } from "../models/db.js";
+import { sakila, sakilaDataWareHouse } from "../../models/db.js";
 
 export async function etl_payment_type(sakila, sakilaDataWareHouse) {
     try {
